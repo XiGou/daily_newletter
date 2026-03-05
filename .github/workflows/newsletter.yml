@@ -11,6 +11,7 @@ permissions:
 jobs:
   generate:
     runs-on: ubuntu-latest
+    environment: ${{ vars.ACTIONS_ENVIRONMENT || 'production' }}
     outputs:
       timestamp: ${{ steps.ts.outputs.timestamp }}
       html_filename: ${{ steps.meta.outputs.html_filename }}
@@ -44,8 +45,10 @@ jobs:
       - name: Generate newsletter assets
         env:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
-          AI_API_BASE: ${{ secrets.AI_API_BASE }}
-          AI_MODEL: ${{ secrets.AI_MODEL }}
+          AI_API_BASE: ${{ vars.AI_API_BASE }}
+          AI_MODEL: ${{ vars.AI_MODEL }}
+          ENABLE_AI_SEARCH: ${{ vars.ENABLE_AI_SEARCH }}
+          SKIP_RSS_FETCH: ${{ vars.SKIP_RSS_FETCH }}
           OUTPUT_HTML_PATH: output/${{ steps.meta.outputs.html_filename }}
           SUMMARY_FILE_PATH: output/${{ steps.meta.outputs.summary_filename }}
         run: uv run python daily_newletter.py --mode generate --summary-file output/${{ steps.meta.outputs.summary_filename }}
@@ -128,6 +131,7 @@ jobs:
   notify:
     needs: [generate, deploy]
     runs-on: ubuntu-latest
+    environment: ${{ vars.ACTIONS_ENVIRONMENT || 'production' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
