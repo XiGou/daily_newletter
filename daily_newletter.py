@@ -88,7 +88,8 @@ def fetch_rss_articles(feeds: dict[str, list[str]]) -> dict[str, list[dict[str, 
 
                 if parsed.get("bozo") or not parsed.entries:
                     reason = str(parsed.get("bozo_exception", "无条目"))[:50] if parsed.get("bozo") else "无条目"
-                    print(f"    ✗ {feed_domain} - 失败 ({reason})")
+                    print(f"    ✗ {url}")
+                    print(f"      失败原因: {reason}")
                     fail_count += 1
                     continue
 
@@ -125,8 +126,8 @@ def fetch_rss_articles(feeds: dict[str, list[str]]) -> dict[str, list[dict[str, 
                 time.sleep(0.12)
 
             except Exception as e:
-                feed_domain = url.split("/")[2] if "//" in url else url
-                print(f"    ✗ {feed_domain} - 异常 ({str(e)[:50]})")
+                print(f"    ✗ {url}")
+                print(f"      异常: {str(e)[:80]}")
                 fail_count += 1
 
         print(f"    小计: {len(section_articles)} 条新闻")
