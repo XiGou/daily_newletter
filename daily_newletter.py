@@ -241,17 +241,8 @@ def generate_ai_summary(articles_by_section: dict[str, list[dict[str, str]]]) ->
 
         response = client.responses.create(
             model=AI_MODEL,
-            messages=[
-                {"role": "system", "content": system_content},
-                {"role": "user", "content": prompt},
-            ],
-            tools=[{
-                "type": "function",
-                "function": {
-                    "name": "web_search",
-                    "description": "Search the web for real-time information"
-                }
-            }],
+            instructions=system_content,
+            input=prompt,
             temperature=0.35,
         )
     else:
@@ -269,7 +260,14 @@ def generate_ai_summary(articles_by_section: dict[str, list[dict[str, str]]]) ->
             temperature=0.35,
         )
 
-    content = response.choices[0].message.content
+    # 处理响应内容（兼容不同的 API 返回格式）
+    if is_grok and ENABLE_AI_SEARCH:
+        # Grok responses API 返回格式
+        content = response.text if hasattr(response, 'text') else response.choices[0].message.content
+    else:
+        # 标准 OpenAI 格式
+        content = response.choices[0].message.content
+
     if not content:
         raise RuntimeError("AI 返回为空")
     return content.strip()
