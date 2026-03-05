@@ -29,6 +29,8 @@
 
 - `AI_API_BASE`：兼容 OpenAI 协议的网关地址
 - `AI_MODEL`：模型名，默认 `gpt-4o-mini`
+- `ENABLE_AI_SEARCH`：启用 AI 搜索功能（Grok 等支持实时搜索的模型），`1` 启用，`0` 禁用
+- `MOCK_MODE`：启用调试模式生成假数据，`1` 启用，`0` 禁用
 - `MATTERMOST_USERNAME`：发送者名字
 - `MATTERMOST_ICON_URL`：发送者头像
 - `OUTPUT_HTML_PATH`：HTML 输出路径，默认 `output/newsletter.html`

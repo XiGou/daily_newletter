@@ -51,6 +51,7 @@ SUMMARY_FILE_PATH = os.getenv("SUMMARY_FILE_PATH", "output/summary.md")
 AI_API_KEY = os.getenv("AI_API_KEY")
 AI_API_BASE = os.getenv("AI_API_BASE")
 AI_MODEL = os.getenv("AI_MODEL", "gpt-4o-mini")
+ENABLE_AI_SEARCH = os.getenv("ENABLE_AI_SEARCH", "").lower() in ("1", "true", "yes")
 MOCK_MODE = os.getenv("MOCK_MODE", "").lower() in ("1", "true", "yes")
 MATTERMOST_WEBHOOK_URL = os.getenv("MATTERMOST_WEBHOOK_URL")
 MATTERMOST_USERNAME = os.getenv("MATTERMOST_USERNAME", "Daily Newsletter Bot")
@@ -219,12 +220,20 @@ def generate_ai_summary(articles_by_section: dict[str, list[dict[str, str]]]) ->
     client = OpenAI(api_key=AI_API_KEY, base_url=AI_API_BASE)
     prompt = _build_prompt(articles_by_section)
 
+    # 构建系统提示词
+    system_content = "你输出高质量中文国际新闻日报，结构清晰、客观克制、适合企业IM阅读。"
+    
+    # 如果启用搜索功能（适用于Grok等支持实时搜索的模型）
+    if ENABLE_AI_SEARCH:
+        print("[INFO] AI搜索功能已启用，将结合实时信息增强分析")
+        system_content += "\n\n你可以使用实时搜索功能来：1) 验证新闻准确性；2) 补充背景信息；3) 交叉验证关键事件；4) 获取最新进展。请结合搜索结果和输入新闻综合分析。"
+
     response = client.chat.completions.create(
         model=AI_MODEL,
         messages=[
             {
                 "role": "system",
-                "content": "你输出高质量中文国际新闻日报，结构清晰、客观克制、适合企业IM阅读。",
+                "content": system_content,
             },
             {"role": "user", "content": prompt},
         ],
