@@ -32,7 +32,10 @@
 - `ENABLE_AI_SEARCH`：启用 AI 搜索功能，`1` 启用
   - **Grok 模型**（使用 xAI 官方 REST API）：自动使用 `web_search` 工具进行实时网络搜索
   - **其他模型**（OpenAI 兼容）：使用增强型提示词引导分析
-- `MOCK_MODE`：启用调试模式生成假数据，`1` 启用，`0` 禁用
+- `MOCK_MODE`：测试模式（字符串），支持多种模式：
+  - `"0"` 或空值（默认）：正常生产流程，拉取 RSS 调用 AI
+  - `"full"`：完全模拟模式，不拉数据，直接返回假日报（便于前端调试）
+  - `"articles"`：使用内置测试数据调用真实 AI（便于测试 AI 逻辑和 API）
 - `MATTERMOST_USERNAME`：发送者名字
 - `MATTERMOST_ICON_URL`：发送者头像
 - `OUTPUT_HTML_PATH`：HTML 输出路径，默认 `output/newsletter.html`
@@ -82,13 +85,32 @@ uv run python daily_newletter.py --mode all
 
 > **注意**：程序会自动检测并加载 `.env` 文件，无需手动导入环境变量。
 
+**测试模式示例：**
+
+1. **完全模拟模式**（仅前端测试，无 API 调用）：
+   ```bash
+   MOCK_MODE=full uv run python daily_newletter.py --mode generate
+   ```
+   用途：快速测试 HTML 生成、格式渲染等前端逻辑
+
+2. **文章模式**（使用测试数据调用真实 AI）：
+   ```bash
+   MOCK_MODE=articles uv run python daily_newletter.py --mode generate
+   ```
+   用途：测试 AI 调用、提示词优化、API 连接等
+
+3. **正常生产模式**（拉取真实 RSS 数据）：
+   ```bash
+   MOCK_MODE=0 uv run python daily_newletter.py --mode all
+   ```
+
 执行后会：
 
-1. 抓取 RSS
+1. 抓取 RSS（除非采用 mock 模式）
 2. 生成日报 Markdown
 3. 生成 `output/summary.md`
 4. 生成 `output/newsletter.html`
-5. 发到 Mattermost
+5. 发到 Mattermost（--mode all 时）
 
 ## GitHub Actions 部署
 

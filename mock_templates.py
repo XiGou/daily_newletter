@@ -6,6 +6,120 @@ Mock 数据模板
 """
 
 
+def get_mock_articles() -> dict[str, list[dict[str, str]]]:
+    """获取模拟的文章数据，用于测试 AI 调用。"""
+    return {
+        "科技与AI": [
+            {
+                "title": "OpenAI 发布 GPT-5 预览版，性能提升 40%",
+                "link": "https://openai.com/blog/gpt-5-preview",
+                "summary": "OpenAI 今日宣布推出 GPT-5 预览版本，在多个基准测试中性能相比 GPT-4 提升 40%。新版本支持实时视频处理和更复杂的推理任务，主要应用于企业自动化和科学研究。"
+            },
+            {
+                "title": "Meta 开源 Llama 3.5，参数规模达 405B",
+                "link": "https://meta.com/research/llama-3-5",
+                "summary": "Meta 刚发布开源语言模型 Llama 3.5，参数规模达 405B，性能超过 GPT-4。开源社区反应积极，首周下载已超 100 万次，被视为开源 AI 的重大突破。"
+            },
+            {
+                "title": "Google DeepMind AlphaFold 3 突破蛋白质结构预测",
+                "link": "https://deepmind.google/alphafold3",
+                "summary": "AlphaFold 3 在蛋白质结构预测中达到 99% 准确率，支持更快的药物设计过程。已与 Eli Lilly 等制药公司达成合作协议，预计加速新药上市时间。"
+            },
+            {
+                "title": "微软 Azure AI 新增多模态模型支持",
+                "link": "https://microsoft.com/azure/ai",
+                "summary": "微软云服务平台 Azure AI 现支持文本、图像、音频的混合推理，企业用户可直接部署多模态 AI 应用。此举有望推动云厂商之间的竞争加剧。"
+            },
+            {
+                "title": "英伟达发布 H200 高端 GPU 芯片",
+                "link": "https://nvidia.com/h200",
+                "summary": "英伟达宣布 H200 GPU 性能相比上代翻倍，特别优化了大规模语言模型训练。产品库存已被科技巨头提前预定，供应或将紧张。"
+            }
+        ],
+        "全球政治与地缘": [
+            {
+                "title": "美国宣布与中国重启贸易谈判",
+                "link": "https://state.gov/press-release",
+                "summary": "美国国务院宣布将在瑞士苏黎世与中国重启贸易谈判，预计讨论关税、科技限制等议题。分析人士认为这是缓解贸易紧张的积极信号。"
+            },
+            {
+                "title": "欧盟通过数字市场法实施细则",
+                "link": "https://europa.eu/digital-markets-act",
+                "summary": "欧盟正式通过数字市场法实施细则，科技巨头将面临更严格的竞争监管，最高罚款可达营收 10%。法案针对 AI 和数字平台的规范备受关注。"
+            },
+            {
+                "title": "日本与印度签署防务合作协议",
+                "link": "https://mofa.go.jp/press",
+                "summary": "日本和印度签署深化防务合作协议，双方计划在印太地区进行联合军演。这被视为应对地区安全挑战的重要举措。"
+            },
+            {
+                "title": "俄乌冲突胶着，国际和平谈判陷入僵局",
+                "link": "https://un.org/news",
+                "summary": "俄乌双方炮火依然激烈，人道主义危机持续加剧。国际和平谈判无显著进展，难民潮可能继续扩大。"
+            },
+            {
+                "title": "以色列-巴勒斯坦停火谈判再次中断",
+                "link": "https://bbc.com/middle-east",
+                "summary": "中东和平谈判陷入僵局，国际调解前景黯淡。地区紧张局势持续升温，油价可能面临上行压力。"
+            }
+        ],
+        "经济与金融": [
+            {
+                "title": "美联储维持基准利率在 4.5%",
+                "link": "https://federalreserve.gov/press",
+                "summary": "美联储会议决定维持基准利率在 4.5%，释放观望信号。市场预期年内可能有两次降息，金融市场波动可能加大。"
+            },
+            {
+                "title": "欧洲央行面临经济放缓压力",
+                "link": "https://ecb.europa.eu",
+                "summary": "欧元区经济数据疲弱，工业产出下滑。降息呼声高涨，欧洲央行下月会议可能调整政策，欧元承压。"
+            },
+            {
+                "title": "中国三月制造业 PMI 下滑至 49.5",
+                "link": "https://stats.gov.cn",
+                "summary": "中国最新制造业 PMI 数据为 49.5，低于预期。制造业景气度回落，经济下行压力显现，外汇压力可能增加。"
+            },
+            {
+                "title": "比特币突破历史新高 99,500 美元",
+                "link": "https://coinmarketcap.com",
+                "summary": "比特币价格逼近 100,000 美元关口，机构投资者买入力度增加。加密货币作为风险资产的波动性依然突出。"
+            },
+            {
+                "title": "国际油价在 75-80 美元区间振荡",
+                "link": "https://iea.org",
+                "summary": "布伦特原油维持在 75-80 美元区间，中东地缘政治局势是主要推手。能源成本变化对全球通胀具有显著影响。"
+            }
+        ],
+        "军事和武器": [
+            {
+                "title": "美国增加印太地区军事部署",
+                "link": "https://defense.gov/news",
+                "summary": "美国第七舰队派遣增强编队驻扎新加坡和日本，加强印太地区军事存在。此举被视为应对地区安全挑战的战略举措。"
+            },
+            {
+                "title": "北约宣布新一轮乌克兰援助计划",
+                "link": "https://nato.int",
+                "summary": "北约宣布向乌克兰交付防空系统和无人机等军事装备。美国领导的援助总额已超过 200 亿美元。"
+            },
+            {
+                "title": "台湾获得爱国者防空导弹系统",
+                "link": "https://mnd.gov.tw",
+                "summary": "台湾从美国获得 8 套爱国者防空导弹系统，合同金额 16 亿美元。台湾当局称此为防卫自主努力的重要一步。"
+            },
+            {
+                "title": "日本自卫队参加 NATO 大规模军演",
+                "link": "https://mod.go.jp",
+                "summary": "日本自卫队首次参加 NATO 联合军演，参与国超过 20 个。此举展示日本在亚太安全格局中的战略地位。"
+            },
+            {
+                "title": "俄罗斯试射新型中程导弹系统",
+                "link": "https://tass.com",
+                "summary": "俄罗斯宣称新型导弹系统精准度提升，射程逾 3000 公里。这一举动引发西方国家警惕，冷战氛围再次升温。"
+            }
+        ]
+    }
+
+
 def get_mock_summary() -> str:
     """生成假 summary 用于前端调试，不需要 AI API。"""
     return """# 每日简报 · 2026-03-05

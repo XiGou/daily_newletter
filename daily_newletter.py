@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from feeds_config import RSS_FEEDS
-from mock_templates import get_mock_summary
+from mock_templates import get_mock_summary, get_mock_articles
 
 # 如果 .env 文件存在，自动加载环境变量
 load_dotenv()
@@ -29,7 +29,7 @@ AI_API_KEY = os.getenv("AI_API_KEY")
 AI_API_BASE = os.getenv("AI_API_BASE")
 AI_MODEL = os.getenv("AI_MODEL", "gpt-4o-mini")
 ENABLE_AI_SEARCH = os.getenv("ENABLE_AI_SEARCH", "").lower() in ("1", "true", "yes")
-MOCK_MODE = os.getenv("MOCK_MODE", "").lower() in ("1", "true", "yes")
+MOCK_MODE = os.getenv("MOCK_MODE", "").lower()  # 模式: "full"(假数据+假总结), "articles"(假数据调真AI), "0"或无(正常流程)
 MATTERMOST_WEBHOOK_URL = os.getenv("MATTERMOST_WEBHOOK_URL")
 MATTERMOST_USERNAME = os.getenv("MATTERMOST_USERNAME", "Daily Newsletter Bot")
 MATTERMOST_ICON_URL = os.getenv("MATTERMOST_ICON_URL", "")
@@ -142,8 +142,13 @@ def _build_prompt(articles_by_section: dict[str, list[dict[str, str]]]) -> str:
 
 
 def generate_ai_summary(articles_by_section: dict[str, list[dict[str, str]]]) -> str:
-    if MOCK_MODE:
-        print("[DEBUG] 使用 MOCK_MODE 直接返回假 summary")
+    # MOCK_MODE 模式：
+    # - "full": 完全模拟，返回假日报（不拉数据，不调ai）
+    # - "articles": 使用模拟文章数据调用真实 AI（拉假数据，调ai）
+    # - "0" 或其他: 正常生产流程
+    
+    if MOCK_MODE == "full":
+        print("[DEBUG] MOCK_MODE=full，使用完全模拟数据（不调用 AI）")
         return get_mock_summary()
 
     if not AI_API_KEY:
@@ -610,8 +615,14 @@ def main() -> None:
         print("发送完成 ✅")
         return
 
-    print("[1/4] 抓取 RSS ...")
-    articles = fetch_rss_articles(RSS_FEEDS)
+    # 根据 MOCK_MODE 选择数据源
+    if MOCK_MODE == "articles":
+        print("[1/4] 使用模拟文章数据（MOCK_MODE=articles）...")
+        articles = get_mock_articles()
+        print(f"已加载 {sum(len(v) for v in articles.values())} 篇模拟文章用于测试 AI 调用")
+    else:
+        print("[1/4] 抓取 RSS ...")
+        articles = fetch_rss_articles(RSS_FEEDS)
 
     print("[2/4] 生成 AI 简报 ...")
     summary_md = generate_ai_summary(articles)
