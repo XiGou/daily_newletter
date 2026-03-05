@@ -27,11 +27,11 @@
 
 可选：
 
-- `AI_API_BASE`：兼容 OpenAI 协议的网关地址
-- `AI_MODEL`：模型名，默认 `gpt-4o-mini`
+- `AI_API_BASE`：兼容 OpenAI 协议的网关地址。对于 **Grok**，设为 `https://api.x.ai/v1`
+- `AI_MODEL`：模型名，默认 `gpt-4o-mini`。对于 **Grok**，可设为 `grok-4`、`grok-3` 等
 - `ENABLE_AI_SEARCH`：启用 AI 搜索功能，`1` 启用
-  - **Grok 模型**：自动使用官方 `web_search` 工具进行实时信息检索
-  - **其他模型**：使用增强型提示词引导分析
+  - **Grok 模型**（使用 xAI 官方 REST API）：自动使用 `web_search` 工具进行实时网络搜索
+  - **其他模型**（OpenAI 兼容）：使用增强型提示词引导分析
 - `MOCK_MODE`：启用调试模式生成假数据，`1` 启用，`0` 禁用
 - `MATTERMOST_USERNAME`：发送者名字
 - `MATTERMOST_ICON_URL`：发送者头像
@@ -64,6 +64,15 @@ export MATTERMOST_WEBHOOK_URL="https://mattermost.example/hooks/xxxx"
 # 可选
 # export AI_API_BASE="https://api.openai.com/v1"
 # export AI_MODEL="gpt-4o-mini"
+```
+
+**Grok 配置示例：**
+```bash
+export AI_API_KEY="your-xai-api-key"
+export AI_API_BASE="https://api.x.ai/v1"
+export AI_MODEL="grok-4"
+export ENABLE_AI_SEARCH="1"
+export MATTERMOST_WEBHOOK_URL="your-webhook-url"
 ```
 
 **运行程序：**
