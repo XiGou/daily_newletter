@@ -142,15 +142,6 @@ def _build_prompt(articles_by_section: dict[str, list[dict[str, str]]]) -> str:
 
 
 def generate_ai_summary(articles_by_section: dict[str, list[dict[str, str]]]) -> str:
-    # MOCK_MODE 模式：
-    # - "full": 完全模拟，返回假日报（不拉数据，不调ai）
-    # - "articles": 使用模拟文章数据调用真实 AI（拉假数据，调ai）
-    # - "0" 或其他: 正常生产流程
-    
-    if MOCK_MODE == "full":
-        print("[DEBUG] MOCK_MODE=full，使用完全模拟数据（不调用 AI）")
-        return get_mock_summary()
-
     if not AI_API_KEY:
         raise ValueError("AI_API_KEY 未设置")
 
@@ -613,6 +604,25 @@ def main() -> None:
             raise RuntimeError("summary 文件为空，无法发送")
         send_to_mattermost(summary_md)
         print("发送完成 ✅")
+        return
+
+    # 完全模拟模式：跳过所有数据获取和 AI 调用，直接返回假日报
+    if MOCK_MODE == "full":
+        print("[DEBUG] MOCK_MODE=full，使用完全模拟数据（跳过 RSS 和 AI 调用）")
+        summary_md = get_mock_summary()
+        print("[1/2] 已加载模拟日报")
+
+        print("[2/2] 导出 HTML ...")
+        html_path = write_html(summary_md, OUTPUT_HTML_PATH)
+        print(f"HTML 已生成: {html_path}")
+
+        if args.mode == "generate":
+            print("生成完成 ✅")
+            return
+
+        print("[3/3] 发送 Mattermost ...")
+        send_to_mattermost(summary_md)
+        print("完成 ✅")
         return
 
     # 根据 MOCK_MODE 选择数据源
