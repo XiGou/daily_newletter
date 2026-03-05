@@ -1,0 +1,14 @@
+[project]
+name = "daily-newsletter"
+version = "0.1.0"
+description = "Generate daily newsletter from RSS with AI, send to Mattermost, export HTML"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "feedparser>=6.0.11",
+    "openai>=1.68.2",
+    "requests>=2.32.3",
+]
+
+[tool.uv]
+package = false

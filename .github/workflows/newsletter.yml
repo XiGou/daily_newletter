@@ -1,0 +1,158 @@
+name: Daily Newsletter
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    outputs:
+      timestamp: ${{ steps.ts.outputs.timestamp }}
+      html_filename: ${{ steps.meta.outputs.html_filename }}
+      summary_filename: ${{ steps.meta.outputs.summary_filename }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies with uv
+        run: uv sync
+
+      - name: Build timestamp metadata
+        id: ts
+        run: echo "timestamp=$(date +'%Y%m%d-%H%M%S')" >> "$GITHUB_OUTPUT"
+
+      - name: Build output filenames
+        id: meta
+        run: |
+          echo "html_filename=newsletter-${{ steps.ts.outputs.timestamp }}.html" >> "$GITHUB_OUTPUT"
+          echo "summary_filename=summary-${{ steps.ts.outputs.timestamp }}.md" >> "$GITHUB_OUTPUT"
+
+      - name: Generate newsletter assets
+        env:
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_API_BASE: ${{ secrets.AI_API_BASE }}
+          AI_MODEL: ${{ secrets.AI_MODEL }}
+          OUTPUT_HTML_PATH: output/${{ steps.meta.outputs.html_filename }}
+          SUMMARY_FILE_PATH: output/${{ steps.meta.outputs.summary_filename }}
+        run: uv run python daily_newletter.py --mode generate --summary-file output/${{ steps.meta.outputs.summary_filename }}
+
+      - name: Update latest pointer
+        run: cp output/${{ steps.meta.outputs.html_filename }} output/latest.html
+
+      - name: Upload summary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: newsletter-summary
+          path: output/${{ steps.meta.outputs.summary_filename }}
+          if-no-files-found: error
+
+      - name: Upload site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: newsletter-site
+          path: |
+            output/${{ steps.meta.outputs.html_filename }}
+            output/latest.html
+          if-no-files-found: error
+
+      - name: Upload HTML artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newsletter-html
+          path: output/${{ steps.meta.outputs.html_filename }}
+          if-no-files-found: warn
+
+  deploy:
+    needs: generate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      page_url: ${{ steps.urls.outputs.page_url }}
+      html_url: ${{ steps.urls.outputs.html_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download site artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: newsletter-site
+          path: output
+
+      - name: Prepare publish directory
+        run: |
+          mkdir -p public
+          cp output/${{ needs.generate.outputs.html_filename }} public/
+          cp output/latest.html public/
+
+      - name: Deploy to gh-pages (keep history)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./public
+          keep_files: true
+
+      - name: Build page URLs
+        id: urls
+        env:
+          REPOSITORY: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          HTML_FILE: ${{ needs.generate.outputs.html_filename }}
+        run: |
+          repo_name="${REPOSITORY#*/}"
+          if [ "$repo_name" = "${OWNER}.github.io" ]; then
+            page_url="https://${OWNER}.github.io/"
+          else
+            page_url="https://${OWNER}.github.io/${repo_name}/"
+          fi
+          echo "page_url=${page_url}" >> "$GITHUB_OUTPUT"
+          echo "html_url=${page_url}${HTML_FILE}" >> "$GITHUB_OUTPUT"
+
+  notify:
+    needs: [generate, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies with uv
+        run: uv sync
+
+      - name: Download summary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: newsletter-summary
+          path: output
+
+      - name: Send to Mattermost with Pages URL
+        env:
+          MATTERMOST_WEBHOOK_URL: ${{ secrets.MATTERMOST_WEBHOOK_URL }}
+          MATTERMOST_USERNAME: ${{ secrets.MATTERMOST_USERNAME }}
+          MATTERMOST_ICON_URL: ${{ secrets.MATTERMOST_ICON_URL }}
+          NEWSLETTER_HTML_URL: ${{ needs.deploy.outputs.html_url }}
+        run: uv run python daily_newletter.py --mode send --summary-file output/${{ needs.generate.outputs.summary_filename }}
