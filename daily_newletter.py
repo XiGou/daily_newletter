@@ -118,13 +118,19 @@ def fetch_rss_articles(feeds: dict[str, list[str]]) -> dict[str, list[dict[str, 
 
 def _build_prompt(articles_by_section: dict[str, list[dict[str, str]]]) -> str:
     prompt = [
-        "你是资深国际新闻编辑，请将输入新闻整理为中文‘每日简报’。",
+        "你是资深国际新闻编辑，请以输入新闻为基础整理为中文‘每日简报’。",
         "要求：",
-        "1) 每个板块最多保留5条最重要新闻。",
+        "1) 每个板块最多保留5条最重要新闻，由你依据新闻本身的重要性来判断。",
+        "分四个板块，每板块科技与AI、全球政治与地缘、中东/以色列、经济与金融、军事和武器",
         "2) 每条格式：- 标题｜来源域名｜核心内容（2句）｜影响（1句）",
         "3) 最后输出‘今日总结’：5条趋势判断。",
         "4) 避免夸张措辞，不确定信息要标注‘待进一步确认’。",
         "5) 输出必须是 Markdown，适配 Mattermost（禁止 HTML 标签）。",
+        "6) 输出内容必须基于输入新闻，不能凭空捏造信息。",
+        "7) 请使用模型内置 websearch 工具来在你认为有价值的来源进行搜索更多的新闻， 不要局限于输入的新闻，"
+        "将搜索到的结果与输入的新闻结合进行分析验证新闻的准确性，补充背景信息，交叉验证关键事件，获取最新进展等，"
+        "以提升简报的质量和时效性。",
+        "8) 如果确信我提供的新闻是不准确的或者过时的，请忽略并用 websearch 工具搜索最新信息，不要基于错误信息进行分析。",
         "",
         "新闻输入：",
     ]
@@ -157,17 +163,35 @@ def generate_ai_summary(articles_by_section: dict[str, list[dict[str, str]]]) ->
         AI_MODEL and "grok" in AI_MODEL.lower()
     )
 
-    # 如果是 Grok，使用 xAI 官方 REST API
+    client = OpenAI(api_key=AI_API_KEY, base_url=AI_API_BASE)
+
+    # 如果是 Grok，使用 OpenAI SDK 的 responses.create() 和 web_search 工具
     if is_grok:
-        content = _generate_with_grok_official_api(system_content, prompt)
+        tools = []
+        if ENABLE_AI_SEARCH:
+            print("[INFO] 启用 Grok web_search 工具进行实时信息增强")
+            tools.append({"type": "web_search"})
+            system_content += "\n\n你可以使用搜索工具来：1) 验证新闻准确性；2) 补充背景信息；3) 交叉验证关键事件；4) 获取最新进展。"
+
+        response = client.responses.create(
+            model=AI_MODEL,
+            input=[
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": prompt},
+            ],
+            tools=tools,
+            temperature=0.35,
+        )
+        content = response.output_text
+        if not content:
+            raise RuntimeError("Grok 返回为空")
         return content.strip()
     else:
-        # 其他 OpenAI 兼容模型
+        # 其他 OpenAI 兼容模型，使用 chat.completions.create()
         if ENABLE_AI_SEARCH:
             print("[INFO] AI搜索功能已启用，使用增强型提示词")
             system_content += "\n\n请结合你的知识库和输入新闻进行综合分析。"
 
-        client = OpenAI(api_key=AI_API_KEY, base_url=AI_API_BASE)
         response = client.chat.completions.create(
             model=AI_MODEL,
             messages=[
@@ -181,64 +205,6 @@ def generate_ai_summary(articles_by_section: dict[str, list[dict[str, str]]]) ->
             raise RuntimeError("AI 返回为空")
         return content.strip()
 
-
-def _generate_with_grok_official_api(system_content: str, prompt: str) -> str:
-    """使用 xAI 官方 REST API 调用 Grok"""
-    import json
-
-    # xAI API 端点
-    url = "https://api.x.ai/v1/chat/completions"
-
-    # 构建请求
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {AI_API_KEY}"
-    }
-
-    messages = [
-        {"role": "system", "content": system_content},
-        {"role": "user", "content": prompt}
-    ]
-
-    payload = {
-        "model": AI_MODEL,
-        "messages": messages,
-        "temperature": 0.35,
-    }
-
-    # 如果启用搜索，添加 web_search 工具
-    if ENABLE_AI_SEARCH:
-        print("[INFO] 使用 Grok web_search 功能进行实时信息增强")
-        system_content += "\n\n你可以使用搜索工具来：1) 验证新闻准确性；2) 补充背景信息；3) 交叉验证关键事件；4) 获取最新进展。"
-        payload["tools"] = [{
-            "type": "function",
-            "function": {
-                "name": "web_search",
-                "description": "Search the web for real-time information"
-            }
-        }]
-
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=60)
-        response.raise_for_status()
-        result = response.json()
-
-        # 提取内容
-        if "choices" in result and len(result["choices"]) > 0:
-            message = result["choices"][0].get("message", {})
-            content = message.get("content")
-            if content:
-                return content
-
-            # 如果有工具调用，获取工具调用结果
-            if "tool_calls" in message:
-                print(f"[INFO] Grok 使用了搜索工具")
-                # xAI API 会自动处理工具调用并返回最终结果
-                return content if content else ""
-
-        raise RuntimeError(f"xAI API 返回格式错误: {result}")
-    except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"xAI API 请求失败: {str(e)}")
 
 
 def _markdown_to_html(md: str) -> str:
