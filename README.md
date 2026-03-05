@@ -47,15 +47,31 @@
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 uv sync
+```
 
+**配置环境变量（两种方式任选）：**
+
+方式一：创建 `.env` 文件（推荐）
+```bash
+cp .env.example .env
+# 编辑 .env 填入你的配置
+```
+
+方式二：直接 export（临时）
+```bash
 export AI_API_KEY="xxx"
 export MATTERMOST_WEBHOOK_URL="https://mattermost.example/hooks/xxxx"
 # 可选
 # export AI_API_BASE="https://api.openai.com/v1"
 # export AI_MODEL="gpt-4o-mini"
+```
 
+**运行程序：**
+```bash
 uv run python daily_newletter.py --mode all
 ```
+
+> **注意**：程序会自动检测并加载 `.env` 文件，无需手动导入环境变量。
 
 执行后会：
 

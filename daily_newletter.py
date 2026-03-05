@@ -10,7 +10,11 @@ from datetime import datetime, timezone, timedelta
 
 import feedparser
 import requests
+from dotenv import load_dotenv
 from openai import OpenAI
+
+# 如果 .env 文件存在，自动加载环境变量
+load_dotenv()
 
 RSS_FEEDS = {
     "科技与AI": [
