@@ -69,42 +69,71 @@ def _clean_text(value: str, max_len: int = 320) -> str:
 def fetch_rss_articles(feeds: dict[str, list[str]]) -> dict[str, list[dict[str, str]]]:
     articles_by_section: dict[str, list[dict[str, str]]] = {}
     seen_links: set[str] = set()
+    
+    total_feeds = sum(len(urls) for urls in feeds.values())
+    success_count = 0
+    fail_count = 0
+    
+    print(f"  开始抓取 {total_feeds} 个 RSS 源...")
+    print()
 
     for section, urls in feeds.items():
+        print(f"  [{section}]")
         section_articles: list[dict[str, str]] = []
+        
         for url in urls:
-            parsed = feedparser.parse(url)
-            if parsed.get("bozo"):
-                print(f"[WARN] RSS 解析异常: {url}")
-
-            for entry in parsed.entries[:MAX_PER_FEED]:
-                title = _clean_text(getattr(entry, "title", ""), max_len=180)
-                link = getattr(entry, "link", "").strip()
-                summary = _clean_text(
-                    getattr(entry, "summary", "") or getattr(entry, "description", ""),
-                    max_len=320,
-                )
-
-                if not title or not link or link in seen_links:
+            try:
+                parsed = feedparser.parse(url)
+                feed_domain = url.split("/")[2] if "//" in url else url
+                
+                if parsed.get("bozo") or not parsed.entries:
+                    reason = str(parsed.get("bozo_exception", "无条目"))[:50] if parsed.get("bozo") else "无条目"
+                    print(f"    ✗ {feed_domain} - 失败 ({reason})")
+                    fail_count += 1
                     continue
+                
+                articles_before = len(section_articles)
+                for entry in parsed.entries[:MAX_PER_FEED]:
+                    title = _clean_text(getattr(entry, "title", ""), max_len=180)
+                    link = getattr(entry, "link", "").strip()
+                    summary = _clean_text(
+                        getattr(entry, "summary", "") or getattr(entry, "description", ""),
+                        max_len=320,
+                    )
 
-                seen_links.add(link)
-                section_articles.append(
-                    {
-                        "title": title,
-                        "link": link,
-                        "summary": summary,
-                    }
-                )
+                    if not title or not link or link in seen_links:
+                        continue
 
+                    seen_links.add(link)
+                    section_articles.append(
+                        {
+                            "title": title,
+                            "link": link,
+                            "summary": summary,
+                        }
+                    )
+
+                    if len(section_articles) >= MAX_PER_SECTION_INPUT:
+                        break
+                
+                articles_fetched = len(section_articles) - articles_before
+                print(f"    ✓ {feed_domain} - 成功 ({articles_fetched} 条)")
+                success_count += 1
+                
                 if len(section_articles) >= MAX_PER_SECTION_INPUT:
                     break
-
-            if len(section_articles) >= MAX_PER_SECTION_INPUT:
-                break
-            time.sleep(0.12)
-
+                time.sleep(0.12)
+                
+            except Exception as e:
+                feed_domain = url.split("/")[2] if "//" in url else url
+                print(f"    ✗ {feed_domain} - 异常 ({str(e)[:50]})")
+                fail_count += 1
+        
+        print(f"    小计: {len(section_articles)} 条新闻")
+        print()
         articles_by_section[section] = section_articles
+    
+    print(f"  抓取完成: {success_count} 成功, {fail_count} 失败, 共 {sum(len(v) for v in articles_by_section.values())} 条新闻")
     return articles_by_section
 
 
@@ -212,10 +241,10 @@ def _markdown_to_html(md: str) -> str:
     html_lines = []
     in_list = False
     in_section = False
-    
+
     for line in lines:
         stripped = line.strip()
-        
+
         # 空行
         if not stripped:
             if in_list:
@@ -225,7 +254,7 @@ def _markdown_to_html(md: str) -> str:
                 html_lines.append("</section>")
                 in_section = False
             continue
-        
+
         # ## 二级标题（板块标题）
         if stripped.startswith("## "):
             if in_list:
@@ -237,13 +266,13 @@ def _markdown_to_html(md: str) -> str:
             html_lines.append(f'<section class="section"><h2>{section_title}</h2>')
             in_section = True
             continue
-        
+
         # # 一级标题
         if stripped.startswith("# "):
             title = html.escape(stripped[2:].strip())
             html_lines.append(f'<div class="doc-subtitle">{title}</div>')
             continue
-        
+
         # - 列表项
         if stripped.startswith("- "):
             if not in_list:
@@ -255,7 +284,7 @@ def _markdown_to_html(md: str) -> str:
             content = html.escape(content).replace("&lt;strong&gt;", "<strong>").replace("&lt;/strong&gt;", "</strong>")
             html_lines.append(f"<li>{content}</li>")
             continue
-        
+
         # 数字列表
         if re.match(r'^\d+\.\s', stripped):
             content = re.sub(r'^\d+\.\s+', '', stripped)
@@ -263,7 +292,7 @@ def _markdown_to_html(md: str) -> str:
             content = html.escape(content).replace("&lt;strong&gt;", "<strong>").replace("&lt;/strong&gt;", "</strong>")
             html_lines.append(f'<div class="summary-item">{content}</div>')
             continue
-        
+
         # 普通段落
         if in_list:
             html_lines.append("</ul>")
@@ -271,18 +300,18 @@ def _markdown_to_html(md: str) -> str:
         content = html.escape(stripped)
         content = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', content)
         html_lines.append(f"<p>{content}</p>")
-    
+
     if in_list:
         html_lines.append("</ul>")
     if in_section:
         html_lines.append("</section>")
-    
+
     return "\n".join(html_lines)
 
 
 def _build_html(newsletter_markdown: str, created_at: str) -> str:
     body_html = _markdown_to_html(newsletter_markdown)
-    
+
     return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -291,7 +320,7 @@ def _build_html(newsletter_markdown: str, created_at: str) -> str:
   <title>每日新闻简报 - Daily Intelligence Brief</title>
   <style>
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-    
+
     body {{
       font-family: 'Times New Roman', Times, Georgia, serif;
       font-size: 14px;
@@ -301,7 +330,7 @@ def _build_html(newsletter_markdown: str, created_at: str) -> str:
       margin: 0;
       padding: 20px;
     }}
-    
+
     .document {{
       max-width: 900px;
       margin: 0 auto;
@@ -309,14 +338,14 @@ def _build_html(newsletter_markdown: str, created_at: str) -> str:
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       border: 1px solid #d0d0d0;
     }}
-    
+
     .doc-header {{
       background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
       color: #ffffff;
       padding: 32px 40px;
       border-bottom: 4px solid #c9a961;
     }}
-    
+
     .doc-title-main {{
       font-size: 28px;
       font-weight: 700;
@@ -325,7 +354,7 @@ def _build_html(newsletter_markdown: str, created_at: str) -> str:
       margin-bottom: 8px;
       font-family: Arial, sans-serif;
     }}
-    
+
     .doc-subtitle {{
       font-size: 16px;
       font-weight: 400;
@@ -334,7 +363,7 @@ def _build_html(newsletter_markdown: str, created_at: str) -> str:
       padding-top: 12px;
       border-top: 1px solid rgba(255,255,255,0.3);
     }}
-    
+
     .doc-meta {{
       display: flex;
       justify-content: space-between;
@@ -344,7 +373,7 @@ def _build_html(newsletter_markdown: str, created_at: str) -> str:
       border-bottom: 2px solid #d0d7de;
       font-size: 12px;
     }}
-    
+
     .doc-meta-item {{
       display: flex;
       align-items: center;
@@ -352,22 +381,22 @@ def _build_html(newsletter_markdown: str, created_at: str) -> str:
       color: #57606a;
       font-family: Arial, sans-serif;
     }}
-    
+
     .doc-meta-label {{
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }}
-    
+
     .doc-content {{
       padding: 40px 40px 48px 40px;
     }}
-    
+
     .section {{
       margin-bottom: 36px;
       page-break-inside: avoid;
     }}
-    
+
     .section h2 {{
       font-size: 16px;
       font-weight: 700;
@@ -380,13 +409,13 @@ def _build_html(newsletter_markdown: str, created_at: str) -> str:
       margin-bottom: 20px;
       font-family: Arial, sans-serif;
     }}
-    
+
     .section ul {{
       list-style: none;
       margin: 0;
       padding: 0;
     }}
-    
+
     .section li {{
       margin-bottom: 18px;
       padding-left: 24px;
@@ -394,7 +423,7 @@ def _build_html(newsletter_markdown: str, created_at: str) -> str:
       line-height: 1.7;
       color: #24292f;
     }}
-    
+
     .section li:before {{
       content: "\u25a0";
       position: absolute;
@@ -403,12 +432,12 @@ def _build_html(newsletter_markdown: str, created_at: str) -> str:
       font-size: 10px;
       top: 4px;
     }}
-    
+
     .section li strong {{
       color: #1a1a1a;
       font-weight: 700;
     }}
-    
+
     .summary-item {{
       padding: 12px 16px;
       margin-bottom: 12px;
@@ -417,12 +446,12 @@ def _build_html(newsletter_markdown: str, created_at: str) -> str:
       line-height: 1.65;
       color: #24292f;
     }}
-    
+
     .summary-item strong {{
       color: #1a1a1a;
       font-weight: 700;
     }}
-    
+
     .doc-footer {{
       padding: 24px 40px;
       background: #f6f8fa;
@@ -433,13 +462,13 @@ def _build_html(newsletter_markdown: str, created_at: str) -> str:
       line-height: 1.6;
       font-family: Arial, sans-serif;
     }}
-    
+
     @media print {{
       body {{ background: white; padding: 0; }}
       .document {{ box-shadow: none; border: none; }}
       .section {{ page-break-inside: avoid; }}
     }}
-    
+
     @media (max-width: 768px) {{
       body {{ padding: 0; }}
       .document {{ border: none; }}
@@ -458,7 +487,7 @@ def _build_html(newsletter_markdown: str, created_at: str) -> str:
       <div class="doc-title-main">Daily Intelligence Brief</div>
       <div class="doc-subtitle">每日新闻简报</div>
     </div>
-    
+
     <div class="doc-meta">
       <div class="doc-meta-item">
         <span class="doc-meta-label">Date:</span>
@@ -473,11 +502,11 @@ def _build_html(newsletter_markdown: str, created_at: str) -> str:
         <span>INTERNAL USE</span>
       </div>
     </div>
-    
+
     <div class="doc-content">
       {body_html}
     </div>
-    
+
     <div class="doc-footer">
       This brief is generated using AI-assisted analysis of international news sources.<br>
       Information is provided for reference purposes only and does not represent any official position.
