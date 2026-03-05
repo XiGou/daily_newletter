@@ -206,159 +206,281 @@ def generate_ai_summary(articles_by_section: dict[str, list[dict[str, str]]]) ->
     return content.strip()
 
 
-def _build_html(newsletter_markdown: str, created_at: str) -> str:
-    # 将 Markdown 转为简单 HTML 结构（保持可读性）
-    body = html.escape(newsletter_markdown)
-    # 标题
-    body = re.sub(r"^## (.+)$", r"<h2>\1</h2>", body, flags=re.MULTILINE)
-    # 列表项（以 - 开头）
-    body = re.sub(r"^- (.+)$", r"<li>\1</li>", body, flags=re.MULTILINE)
-    # 段落分组
-    body = re.sub(r"(<li>.+?</li>)", r"<ul>\1</ul>", body, flags=re.DOTALL)
-    body = body.replace("\n</ul>\n<ul>", "\n")
+def _markdown_to_html(md: str) -> str:
+    """轻量级Markdown渲染，支持加粗、标题、列表"""
+    lines = md.split("\n")
+    html_lines = []
+    in_list = False
+    in_section = False
+    
+    for line in lines:
+        stripped = line.strip()
+        
+        # 空行
+        if not stripped:
+            if in_list:
+                html_lines.append("</ul>")
+                in_list = False
+            if in_section:
+                html_lines.append("</section>")
+                in_section = False
+            continue
+        
+        # ## 二级标题（板块标题）
+        if stripped.startswith("## "):
+            if in_list:
+                html_lines.append("</ul>")
+                in_list = False
+            if in_section:
+                html_lines.append("</section>")
+            section_title = html.escape(stripped[3:].strip())
+            html_lines.append(f'<section class="section"><h2>{section_title}</h2>')
+            in_section = True
+            continue
+        
+        # # 一级标题
+        if stripped.startswith("# "):
+            title = html.escape(stripped[2:].strip())
+            html_lines.append(f'<div class="doc-subtitle">{title}</div>')
+            continue
+        
+        # - 列表项
+        if stripped.startswith("- "):
+            if not in_list:
+                html_lines.append('<ul>')
+                in_list = True
+            content = stripped[2:].strip()
+            # 处理加粗 **text**
+            content = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', content)
+            content = html.escape(content).replace("&lt;strong&gt;", "<strong>").replace("&lt;/strong&gt;", "</strong>")
+            html_lines.append(f"<li>{content}</li>")
+            continue
+        
+        # 数字列表
+        if re.match(r'^\d+\.\s', stripped):
+            content = re.sub(r'^\d+\.\s+', '', stripped)
+            content = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', content)
+            content = html.escape(content).replace("&lt;strong&gt;", "<strong>").replace("&lt;/strong&gt;", "</strong>")
+            html_lines.append(f'<div class="summary-item">{content}</div>')
+            continue
+        
+        # 普通段落
+        if in_list:
+            html_lines.append("</ul>")
+            in_list = False
+        content = html.escape(stripped)
+        content = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', content)
+        html_lines.append(f"<p>{content}</p>")
+    
+    if in_list:
+        html_lines.append("</ul>")
+    if in_section:
+        html_lines.append("</section>")
+    
+    return "\n".join(html_lines)
 
+
+def _build_html(newsletter_markdown: str, created_at: str) -> str:
+    body_html = _markdown_to_html(newsletter_markdown)
+    
     return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>每日新闻简报</title>
+  <title>每日新闻简报 - Daily Intelligence Brief</title>
   <style>
-    * {{ box-sizing: border-box; }}
-    html {{ scroll-behavior: smooth; }}
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    
     body {{
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-      line-height: 1.85;
-      color: #2c3e50;
-      background: #fafbfc;
+      font-family: 'Times New Roman', Times, Georgia, serif;
+      font-size: 14px;
+      line-height: 1.65;
+      color: #1a1a1a;
+      background: #f8f9fa;
       margin: 0;
-      padding: 0;
+      padding: 20px;
     }}
-
-    .container {{
-      max-width: 680px;
+    
+    .document {{
+      max-width: 900px;
       margin: 0 auto;
-      padding: 60px 24px;
+      background: #ffffff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border: 1px solid #d0d0d0;
     }}
-
-    .header {{
-      margin-bottom: 56px;
-      border-bottom: 1px solid #e5e7eb;
-      padding-bottom: 32px;
+    
+    .doc-header {{
+      background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
+      color: #ffffff;
+      padding: 32px 40px;
+      border-bottom: 4px solid #c9a961;
     }}
-
-    h1 {{
-      font-size: 32px;
+    
+    .doc-title-main {{
+      font-size: 28px;
       font-weight: 700;
-      margin: 0 0 12px 0;
-      color: #1a202c;
-      letter-spacing: -0.5px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 8px;
+      font-family: Arial, sans-serif;
     }}
-
-    .meta {{
-      color: #718096;
-      font-size: 14px;
-      font-weight: 400;
-    }}
-
-    h2 {{
-      font-size: 18px;
-      font-weight: 600;
-      margin: 48px 0 24px 0;
-      color: #1a202c;
-      text-transform: none;
-      letter-spacing: 0;
-    }}
-
-    h2:first-child {{ margin-top: 0; }}
-
-    ul {{
-      list-style: none;
-      padding: 0;
-      margin: 0 0 24px 0;
-    }}
-
-    li {{
-      margin: 0 0 20px 0;
-      padding: 0;
-      font-size: 15px;
-      line-height: 1.8;
-      color: #4a5568;
-    }}
-
-    li strong {{
-      color: #1a202c;
-      font-weight: 600;
-    }}
-
-    .summary {{
-      background: #f7fafc;
-      border-left: 4px solid #e0e7ff;
-      padding: 24px;
-      margin: 40px 0;
-      line-height: 1.8;
-    }}
-
-    .summary h3 {{
-      margin: 0 0 16px 0;
+    
+    .doc-subtitle {{
       font-size: 16px;
+      font-weight: 400;
+      opacity: 0.95;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.3);
+    }}
+    
+    .doc-meta {{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 40px;
+      background: #f0f4f8;
+      border-bottom: 2px solid #d0d7de;
+      font-size: 12px;
+    }}
+    
+    .doc-meta-item {{
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #57606a;
+      font-family: Arial, sans-serif;
+    }}
+    
+    .doc-meta-label {{
       font-weight: 600;
-      color: #1a202c;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }}
-
-    .summary ol {{
+    
+    .doc-content {{
+      padding: 40px 40px 48px 40px;
+    }}
+    
+    .section {{
+      margin-bottom: 36px;
+      page-break-inside: avoid;
+    }}
+    
+    .section h2 {{
+      font-size: 16px;
+      font-weight: 700;
+      color: #1e3a5f;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 10px 16px;
+      background: #e8eef5;
+      border-left: 4px solid #2c5282;
+      margin-bottom: 20px;
+      font-family: Arial, sans-serif;
+    }}
+    
+    .section ul {{
+      list-style: none;
       margin: 0;
-      padding-left: 20px;
+      padding: 0;
     }}
-
-    .summary li {{
-      margin: 0 0 12px 0;
-      font-size: 14px;
+    
+    .section li {{
+      margin-bottom: 18px;
+      padding-left: 24px;
+      position: relative;
+      line-height: 1.7;
+      color: #24292f;
     }}
-
-    .footer {{
-      border-top: 1px solid #e5e7eb;
-      margin-top: 48px;
-      padding-top: 32px;
-      color: #a0aec0;
-      font-size: 13px;
+    
+    .section li:before {{
+      content: "\u25a0";
+      position: absolute;
+      left: 4px;
+      color: #2c5282;
+      font-size: 10px;
+      top: 4px;
+    }}
+    
+    .section li strong {{
+      color: #1a1a1a;
+      font-weight: 700;
+    }}
+    
+    .summary-item {{
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      background: #fffbf0;
+      border-left: 3px solid #c9a961;
+      line-height: 1.65;
+      color: #24292f;
+    }}
+    
+    .summary-item strong {{
+      color: #1a1a1a;
+      font-weight: 700;
+    }}
+    
+    .doc-footer {{
+      padding: 24px 40px;
+      background: #f6f8fa;
+      border-top: 2px solid #d0d7de;
+      font-size: 11px;
+      color: #656d76;
+      text-align: center;
       line-height: 1.6;
+      font-family: Arial, sans-serif;
     }}
-
-    @media (max-width: 640px) {{
-      .container {{ padding: 40px 16px; }}
-      h1 {{ font-size: 24px; }}
-      h2 {{ font-size: 16px; margin-top: 32px; }}
-      li {{ font-size: 14px; }}
-      .summary {{ padding: 16px; }}
+    
+    @media print {{
+      body {{ background: white; padding: 0; }}
+      .document {{ box-shadow: none; border: none; }}
+      .section {{ page-break-inside: avoid; }}
     }}
-
-    @media (prefers-color-scheme: dark) {{
-      body {{ background: #0f1419; color: #e2e8f0; }}
-      .header {{ border-bottom-color: #2d3748; }}
-      h1, h2 {{ color: #f7fafc; }}
-      li strong {{ color: #f7fafc; }}
-      .meta {{ color: #a0aec0; }}
-      li {{ color: #cbd5e0; }}
-      .summary {{ background: #1e2738; border-left-color: #3c366b; }}
-      .summary h3 {{ color: #f7fafc; }}
-      .footer {{ color: #718096; border-top-color: #2d3748; }}
+    
+    @media (max-width: 768px) {{
+      body {{ padding: 0; }}
+      .document {{ border: none; }}
+      .doc-header {{ padding: 24px 20px; }}
+      .doc-title-main {{ font-size: 22px; }}
+      .doc-meta {{ flex-direction: column; gap: 8px; align-items: flex-start; padding: 12px 20px; }}
+      .doc-content {{ padding: 24px 20px; }}
+      .section h2 {{ font-size: 14px; padding: 8px 12px; }}
+      .section li {{ font-size: 13px; }}
     }}
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>每日新闻简报</h1>
-      <p class="meta">📅 {html.escape(created_at)}</p>
+  <div class="document">
+    <div class="doc-header">
+      <div class="doc-title-main">Daily Intelligence Brief</div>
+      <div class="doc-subtitle">每日新闻简报</div>
     </div>
-
-    <article>
-      {body}
-    </article>
-
-    <div class="footer">
-      <p>本简报精选国际新闻事件，使用 AI 整理分析。仅供参考，不代表任何立场。</p>
+    
+    <div class="doc-meta">
+      <div class="doc-meta-item">
+        <span class="doc-meta-label">Date:</span>
+        <span>{html.escape(created_at.split()[0])}</span>
+      </div>
+      <div class="doc-meta-item">
+        <span class="doc-meta-label">Classification:</span>
+        <span>UNCLASSIFIED</span>
+      </div>
+      <div class="doc-meta-item">
+        <span class="doc-meta-label">Distribution:</span>
+        <span>INTERNAL USE</span>
+      </div>
+    </div>
+    
+    <div class="doc-content">
+      {body_html}
+    </div>
+    
+    <div class="doc-footer">
+      This brief is generated using AI-assisted analysis of international news sources.<br>
+      Information is provided for reference purposes only and does not represent any official position.
     </div>
   </div>
 </body>
