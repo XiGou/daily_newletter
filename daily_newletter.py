@@ -222,23 +222,49 @@ def generate_ai_summary(articles_by_section: dict[str, list[dict[str, str]]]) ->
 
     # 构建系统提示词
     system_content = "你输出高质量中文国际新闻日报，结构清晰、客观克制、适合企业IM阅读。"
-    
-    # 如果启用搜索功能（适用于Grok等支持实时搜索的模型）
-    if ENABLE_AI_SEARCH:
-        print("[INFO] AI搜索功能已启用，将结合实时信息增强分析")
+
+    # 检测是否使用 Grok
+    is_grok = (
+        AI_API_BASE and "x.ai" in AI_API_BASE.lower()
+    ) or (
+        AI_MODEL and "grok" in AI_MODEL.lower()
+    )
+
+    # 如果是 Grok 且启用搜索功能，使用官方推荐的 web_search 方式
+    if is_grok and ENABLE_AI_SEARCH:
+        print("[INFO] 使用 Grok web_search 功能进行实时信息增强")
         system_content += "\n\n你可以使用实时搜索功能来：1) 验证新闻准确性；2) 补充背景信息；3) 交叉验证关键事件；4) 获取最新进展。请结合搜索结果和输入新闻综合分析。"
 
-    response = client.chat.completions.create(
-        model=AI_MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": system_content,
-            },
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.35,
-    )
+        response = client.responses.create(
+            model=AI_MODEL,
+            messages=[
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": prompt},
+            ],
+            tools=[{
+                "type": "function",
+                "function": {
+                    "name": "web_search",
+                    "description": "Search the web for real-time information"
+                }
+            }],
+            temperature=0.35,
+        )
+    else:
+        # 标准 OpenAI 兼容调用
+        if ENABLE_AI_SEARCH and not is_grok:
+            print("[INFO] AI搜索功能已启用，但当前模型非 Grok，使用标准提示词")
+            system_content += "\n\n请结合你的知识库和输入新闻进行综合分析。"
+
+        response = client.chat.completions.create(
+            model=AI_MODEL,
+            messages=[
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.35,
+        )
+
     content = response.choices[0].message.content
     if not content:
         raise RuntimeError("AI 返回为空")

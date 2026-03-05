@@ -29,7 +29,9 @@
 
 - `AI_API_BASE`：兼容 OpenAI 协议的网关地址
 - `AI_MODEL`：模型名，默认 `gpt-4o-mini`
-- `ENABLE_AI_SEARCH`：启用 AI 搜索功能（Grok 等支持实时搜索的模型），`1` 启用，`0` 禁用
+- `ENABLE_AI_SEARCH`：启用 AI 搜索功能，`1` 启用
+  - **Grok 模型**：自动使用官方 `web_search` 工具进行实时信息检索
+  - **其他模型**：使用增强型提示词引导分析
 - `MOCK_MODE`：启用调试模式生成假数据，`1` 启用，`0` 禁用
 - `MATTERMOST_USERNAME`：发送者名字
 - `MATTERMOST_ICON_URL`：发送者头像
