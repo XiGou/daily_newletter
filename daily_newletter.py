@@ -69,29 +69,29 @@ def _clean_text(value: str, max_len: int = 320) -> str:
 def fetch_rss_articles(feeds: dict[str, list[str]]) -> dict[str, list[dict[str, str]]]:
     articles_by_section: dict[str, list[dict[str, str]]] = {}
     seen_links: set[str] = set()
-    
+
     total_feeds = sum(len(urls) for urls in feeds.values())
     success_count = 0
     fail_count = 0
-    
+
     print(f"  开始抓取 {total_feeds} 个 RSS 源...")
     print()
 
     for section, urls in feeds.items():
         print(f"  [{section}]")
         section_articles: list[dict[str, str]] = []
-        
+
         for url in urls:
             try:
                 parsed = feedparser.parse(url)
                 feed_domain = url.split("/")[2] if "//" in url else url
-                
+
                 if parsed.get("bozo") or not parsed.entries:
                     reason = str(parsed.get("bozo_exception", "无条目"))[:50] if parsed.get("bozo") else "无条目"
                     print(f"    ✗ {feed_domain} - 失败 ({reason})")
                     fail_count += 1
                     continue
-                
+
                 articles_before = len(section_articles)
                 for entry in parsed.entries[:MAX_PER_FEED]:
                     title = _clean_text(getattr(entry, "title", ""), max_len=180)
@@ -115,24 +115,24 @@ def fetch_rss_articles(feeds: dict[str, list[str]]) -> dict[str, list[dict[str, 
 
                     if len(section_articles) >= MAX_PER_SECTION_INPUT:
                         break
-                
+
                 articles_fetched = len(section_articles) - articles_before
                 print(f"    ✓ {feed_domain} - 成功 ({articles_fetched} 条)")
                 success_count += 1
-                
+
                 if len(section_articles) >= MAX_PER_SECTION_INPUT:
                     break
                 time.sleep(0.12)
-                
+
             except Exception as e:
                 feed_domain = url.split("/")[2] if "//" in url else url
                 print(f"    ✗ {feed_domain} - 异常 ({str(e)[:50]})")
                 fail_count += 1
-        
+
         print(f"    小计: {len(section_articles)} 条新闻")
         print()
         articles_by_section[section] = section_articles
-    
+
     print(f"  抓取完成: {success_count} 成功, {fail_count} 失败, 共 {sum(len(v) for v in articles_by_section.values())} 条新闻")
     return articles_by_section
 
