@@ -29,6 +29,7 @@ AI_API_KEY = os.getenv("AI_API_KEY")
 AI_API_BASE = os.getenv("AI_API_BASE")
 AI_MODEL = os.getenv("AI_MODEL", "gpt-4o-mini")
 ENABLE_AI_SEARCH = os.getenv("ENABLE_AI_SEARCH", "").lower() in ("1", "true", "yes")
+SKIP_RSS_FETCH = os.getenv("SKIP_RSS_FETCH", "").lower() in ("1", "true", "yes")
 MOCK_MODE = os.getenv("MOCK_MODE", "").lower()  # 模式: "full"(假数据+假总结), "articles"(假数据调真AI), "0"或无(正常流程)
 MATTERMOST_WEBHOOK_URL = os.getenv("MATTERMOST_WEBHOOK_URL")
 MATTERMOST_USERNAME = os.getenv("MATTERMOST_USERNAME", "Daily Newsletter Bot")
@@ -596,6 +597,9 @@ def main() -> None:
         print("[1/4] 使用模拟文章数据（MOCK_MODE=articles）...")
         articles = get_mock_articles()
         print(f"已加载 {sum(len(v) for v in articles.values())} 篇模拟文章用于测试 AI 调用")
+    elif SKIP_RSS_FETCH:
+        print("[1/4] 已跳过 RSS 抓取（SKIP_RSS_FETCH=1），仅使用 AI 生成日报...")
+        articles = {section: [] for section in RSS_FEEDS}
     else:
         print("[1/4] 抓取 RSS ...")
         articles = fetch_rss_articles(RSS_FEEDS)

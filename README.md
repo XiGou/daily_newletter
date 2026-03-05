@@ -32,6 +32,7 @@
 - `ENABLE_AI_SEARCH`：启用 AI 搜索功能，`1` 启用
   - **Grok 模型**（使用 xAI 官方 REST API）：自动使用 `web_search` 工具进行实时网络搜索
   - **其他模型**（OpenAI 兼容）：使用增强型提示词引导分析
+- `SKIP_RSS_FETCH`：是否跳过 RSS 抓取，`1` 表示跳过并直接交给 AI 生成（建议与 `ENABLE_AI_SEARCH=1` 搭配）
 - `MOCK_MODE`：测试模式（字符串），支持多种模式：
   - `"0"` 或空值（默认）：正常生产流程，拉取 RSS 调用 AI
   - `"full"`：完全模拟模式，不拉数据，直接返回假日报（便于前端调试）
@@ -102,6 +103,11 @@ uv run python daily_newletter.py --mode all
 3. **正常生产模式**（拉取真实 RSS 数据）：
    ```bash
    MOCK_MODE=0 uv run python daily_newletter.py --mode all
+   ```
+
+4. **仅 AI 模式**（跳过 RSS，全部交给 AI）：
+   ```bash
+   SKIP_RSS_FETCH=1 ENABLE_AI_SEARCH=1 MOCK_MODE=0 uv run python daily_newletter.py --mode generate
    ```
 
 执行后会：
