@@ -602,6 +602,28 @@ def main() -> None:
         print("完成 ✅")
         return
 
+    # Markdown-only 模式：读取已有 markdown 文件，直接转 HTML（测试渲染流程）
+    if MOCK_MODE == "md_only":
+        print("[DEBUG] MOCK_MODE=md_only，读取已有 markdown 文件并测试转 HTML")
+        try:
+            summary_md = read_summary_markdown(args.summary_file)
+            print(f"[1/2] 已读取 markdown: {args.summary_file}")
+        except FileNotFoundError:
+            raise RuntimeError(f"markdown 文件不存在: {args.summary_file}")
+
+        print("[2/2] 导出 HTML ...")
+        html_path = write_html(summary_md, OUTPUT_HTML_PATH)
+        print(f"HTML 已生成: {html_path}")
+
+        if args.mode == "generate":
+            print("生成完成 ✅")
+            return
+
+        print("[3/3] 发送 Mattermost ...")
+        send_to_mattermost(summary_md)
+        print("完成 ✅")
+        return
+
     # 根据 MOCK_MODE 选择数据源
     if MOCK_MODE == "articles":
         print("[1/4] 使用模拟文章数据（MOCK_MODE=articles）...")

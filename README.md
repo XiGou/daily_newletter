@@ -37,6 +37,7 @@
   - `"0"` 或空值（默认）：正常生产流程，拉取 RSS 调用 AI
   - `"full"`：完全模拟模式，不拉数据，直接返回假日报（便于前端调试）
   - `"articles"`：使用内置测试数据调用真实 AI（便于测试 AI 逻辑和 API）
+  - `"md_only"`：读取已有 markdown 文件，直接转 HTML 测试渲染流程
 - `MATTERMOST_USERNAME`：发送者名字
 - `MATTERMOST_ICON_URL`：发送者头像
 - `OUTPUT_HTML_PATH`：HTML 输出路径，默认 `output/newsletter.html`
@@ -109,6 +110,12 @@ uv run python daily_newletter.py --mode all
    ```bash
    SKIP_RSS_FETCH=1 ENABLE_AI_SEARCH=1 MOCK_MODE=0 uv run python daily_newletter.py --mode generate
    ```
+
+5. **Markdown-only 模式**（读取已有 markdown，测试 HTML 转换）：
+   ```bash
+   MOCK_MODE=md_only uv run python daily_newletter.py --mode generate
+   ```
+   用途：快速测试 markdown → HTML 渲染流程，不需要 RSS 或 AI 调用
 
 执行后会：
 
