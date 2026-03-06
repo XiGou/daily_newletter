@@ -212,16 +212,46 @@ def _markdown_to_html(md: str) -> str:
     """轻量级Markdown渲染，支持加粗、标题、列表、链接"""
 
     def _escape_and_format(text: str) -> str:
-        """转义HTML，处理加粗和链接"""
-        # 先处理链接 [text](url)
-        text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2" target="_blank">\1</a>', text)
-        # 处理加粗 **text**
-        text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
-        # HTML转义（但保留已生成的 HTML 标签）
+        """转义HTML，处理加粗、链接和脚注引用"""
+        # 1. 提取所有 markdown 链接，用占位符替换（防止双重转义）
+        links = []
+        def store_link(match):
+            link_text = match.group(1)
+            link_url = match.group(2)
+            # 链接内容单独 escape
+            link_html = f'<a href="{html.escape(link_url)}" target="_blank">{html.escape(link_text)}</a>'
+            links.append(link_html)
+            return f"__LINK_{len(links)-1}__"
+
+        text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', store_link, text)
+
+        # 1b. 提取所有 [[数字]](url) 脚注格式，渲染为上标链接
+        citations = []
+        def store_citation(match):
+            citation_num = match.group(1)
+            citation_url = match.group(2)
+            # 渲染为 <sup> 上标脚注链接
+            citation_html = f'<sup><a href="{html.escape(citation_url)}" target="_blank" class="citation">[{html.escape(citation_num)}]</a></sup>'
+            citations.append(citation_html)
+            return f"__CITATION_{len(citations)-1}__"
+
+        text = re.sub(r'\[\[([^\]]+)\]\]\(([^)]+)\)', store_citation, text)
+
+        # 2. HTML转义其余文本
         text = html.escape(text)
-        text = text.replace("&lt;a href=", "<a href=").replace("&lt;/a&gt;", "</a>")
+
+        # 3. 处理加粗 **text**
+        text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
         text = text.replace("&lt;strong&gt;", "<strong>").replace("&lt;/strong&gt;", "</strong>")
-        text = text.replace("target=&quot;_blank&quot;", 'target="_blank"')
+
+        # 4. 恢复所有链接占位符
+        for i, link_html in enumerate(links):
+            text = text.replace(f"__LINK_{i}__", link_html)
+
+        # 4b. 恢复所有脚注占位符
+        for i, citation_html in enumerate(citations):
+            text = text.replace(f"__CITATION_{i}__", citation_html)
+
         return text
 
     lines = md.split("\n")
@@ -433,6 +463,18 @@ def _build_html(newsletter_markdown: str, created_at: str) -> str:
     .summary-item strong {{
       color: #1a1a1a;
       font-weight: 700;
+    }}
+
+    .citation {{
+      color: #8899aa;
+      font-size: 0.85em;
+      text-decoration: none;
+      transition: color 0.2s;
+    }}
+
+    .citation:hover {{
+      color: #2c5282;
+      text-decoration: underline;
     }}
 
     .doc-footer {{
