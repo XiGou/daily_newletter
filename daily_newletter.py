@@ -123,10 +123,10 @@ def _build_prompt(articles_by_section: dict[str, list[dict[str, str]]]) -> str:
         "要求：",
         "1) 每个板块最多保留5条最重要新闻，由你依据新闻本身的重要性来判断。",
         "分四个板块，每板块科技与AI、全球政治与地缘、中东/以色列、经济与金融、军事和武器",
-        "2) 每条格式：- 标题｜来源域名｜核心内容（2句）｜影响（1句）",
-        "3) 最后输出‘今日总结’：5条趋势判断。",
-        "4) 避免夸张措辞，不确定信息要标注‘待进一步确认’。",
-        "5) 输出必须是 Markdown，适配 Mattermost（禁止 HTML 标签）。",
+        "2) 每条格式：- 标题｜[🔗](URL)｜核心内容（2句）｜影响（1句）",
+        "3) 最后输出'今日总结'：5条趋势判断。",
+        "4) 避免夸张措辞，不确定信息要标注'待进一步确认'。",
+        "5) 输出必须是纯 Markdown（禁止任何 HTML 标签，所有链接用 [符号](url) 格式表示）。",
         "6) 输出内容必须基于输入新闻，不能凭空捏造信息。",
         "7) 请使用模型内置 websearch 工具来在你认为有价值的来源进行搜索更多的新闻， 不要局限于输入的新闻，"
         "将搜索到的结果与输入的新闻结合进行分析验证新闻的准确性，补充背景信息，交叉验证关键事件，获取最新进展等，"
@@ -209,7 +209,21 @@ def generate_ai_summary(articles_by_section: dict[str, list[dict[str, str]]]) ->
 
 
 def _markdown_to_html(md: str) -> str:
-    """轻量级Markdown渲染，支持加粗、标题、列表"""
+    """轻量级Markdown渲染，支持加粗、标题、列表、链接"""
+
+    def _escape_and_format(text: str) -> str:
+        """转义HTML，处理加粗和链接"""
+        # 先处理链接 [text](url)
+        text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2" target="_blank">\1</a>', text)
+        # 处理加粗 **text**
+        text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+        # HTML转义（但保留已生成的 HTML 标签）
+        text = html.escape(text)
+        text = text.replace("&lt;a href=", "<a href=").replace("&lt;/a&gt;", "</a>")
+        text = text.replace("&lt;strong&gt;", "<strong>").replace("&lt;/strong&gt;", "</strong>")
+        text = text.replace("target=&quot;_blank&quot;", 'target="_blank"')
+        return text
+
     lines = md.split("\n")
     html_lines = []
     in_list = False
@@ -252,17 +266,14 @@ def _markdown_to_html(md: str) -> str:
                 html_lines.append('<ul>')
                 in_list = True
             content = stripped[2:].strip()
-            # 处理加粗 **text**
-            content = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', content)
-            content = html.escape(content).replace("&lt;strong&gt;", "<strong>").replace("&lt;/strong&gt;", "</strong>")
+            content = _escape_and_format(content)
             html_lines.append(f"<li>{content}</li>")
             continue
 
         # 数字列表
         if re.match(r'^\d+\.\s', stripped):
             content = re.sub(r'^\d+\.\s+', '', stripped)
-            content = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', content)
-            content = html.escape(content).replace("&lt;strong&gt;", "<strong>").replace("&lt;/strong&gt;", "</strong>")
+            content = _escape_and_format(content)
             html_lines.append(f'<div class="summary-item">{content}</div>')
             continue
 
@@ -270,8 +281,7 @@ def _markdown_to_html(md: str) -> str:
         if in_list:
             html_lines.append("</ul>")
             in_list = False
-        content = html.escape(stripped)
-        content = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', content)
+        content = _escape_and_format(stripped)
         html_lines.append(f"<p>{content}</p>")
 
     if in_list:
